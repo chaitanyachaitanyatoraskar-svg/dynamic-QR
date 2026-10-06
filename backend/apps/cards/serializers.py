@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Card, CardAssignment
+from .models import Card, ActivationSession, CardAssignment
 from apps.businesses.models import Business
 
 class CardSerializer(serializers.ModelSerializer):
@@ -7,18 +7,22 @@ class CardSerializer(serializers.ModelSerializer):
     business_slug = serializers.CharField(source='business.slug', read_only=True)
     permanent_url = serializers.SerializerMethodField()
     qr_image_url = serializers.SerializerMethodField()
+    activated_by_username = serializers.CharField(source='activated_by.username', read_only=True)
+    first_scanned_by_username = serializers.CharField(source='first_scanned_by.username', read_only=True)
 
     class Meta:
         model = Card
         fields = [
             'id', 'card_id', 'public_token', 'status', 'business', 'business_name',
             'business_slug', 'purpose', 'destination_type', 'destination_url',
-            'permanent_url', 'qr_image_url', 'activation_date', 'deactivation_date',
+            'permanent_url', 'qr_image_url', 'first_scanned_at', 'first_scanned_by_username',
+            'activated_at', 'activated_by_username', 'deactivation_date',
             'last_scanned_at', 'scan_count', 'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'card_id', 'public_token', 'permanent_url', 'qr_image_url',
-            'last_scanned_at', 'scan_count', 'created_at', 'updated_at'
+            'first_scanned_at', 'first_scanned_by_username', 'activated_at',
+            'activated_by_username', 'last_scanned_at', 'scan_count', 'created_at', 'updated_at'
         ]
 
     def get_permanent_url(self, obj):
@@ -29,19 +33,31 @@ class CardSerializer(serializers.ModelSerializer):
             return obj.qr_image.url
         return None
 
-class CardActivationSerializer(serializers.Serializer):
-    business_id = serializers.IntegerField(required=True)
-    purpose = serializers.CharField(max_length=64, default='Digital Menu')
-    destination_type = serializers.ChoiceField(choices=Card.DESTINATION_TYPE_CHOICES, default=Card.DEST_DIGITAL_MENU)
-    destination_url = serializers.CharField(max_length=500, required=False, allow_blank=True)
-    notes = serializers.CharField(required=False, allow_blank=True)
 
-class CardReassignSerializer(serializers.Serializer):
-    business_id = serializers.IntegerField(required=True)
-    purpose = serializers.CharField(max_length=64, default='Digital Menu')
-    destination_type = serializers.ChoiceField(choices=Card.DESTINATION_TYPE_CHOICES, default=Card.DEST_DIGITAL_MENU)
-    destination_url = serializers.CharField(max_length=500, required=False, allow_blank=True)
-    notes = serializers.CharField(required=False, allow_blank=True)
+class ActivationSessionSerializer(serializers.ModelSerializer):
+    admin_username = serializers.CharField(source='admin_user.username', read_only=True)
+    card_id = serializers.CharField(source='card.card_id', read_only=True)
+
+    class Meta:
+        model = ActivationSession
+        fields = [
+            'id', 'session_token', 'admin_username', 'card', 'card_id',
+            'status', 'created_at', 'scanned_at', 'expires_at', 'completed_at'
+        ]
+        read_only_fields = fields
+
+
+class VerifyScanSerializer(serializers.Serializer):
+    card_id = serializers.CharField(required=True, max_length=32)
+
+
+class CompleteActivationSerializer(serializers.Serializer):
+    business_id = serializers.IntegerField(required=False, allow_null=True)
+    client_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    destination_url = serializers.CharField(required=True, max_length=500)
+    purpose = serializers.CharField(required=False, allow_blank=True, default='Client Website')
+    notes = serializers.CharField(required=False, allow_blank=True, default='')
+
 
 class BulkCardGenerationSerializer(serializers.Serializer):
     count = serializers.IntegerField(min_value=1, max_value=500, default=10)

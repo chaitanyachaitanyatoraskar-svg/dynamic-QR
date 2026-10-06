@@ -15,22 +15,25 @@ export const DynamicGoResolver = () => {
         const res = await cardService.resolveDirect(cardId);
         const data = res.data;
 
-        if (data.status === 'ACTIVE' && data.target_url) {
+        const target = data.destination_url || data.target_url;
+        if (data.status === 'ACTIVE' && target) {
           // If external destination, redirect window
-          if (data.target_url.startsWith('http://') || data.target_url.startsWith('https://')) {
+          if (target.startsWith('http://') || target.startsWith('https://')) {
             const currentOrigin = window.location.origin;
-            if (data.target_url.startsWith(currentOrigin)) {
+            if (target.startsWith(currentOrigin)) {
               // Internal SPA path
-              const relativePath = data.target_url.replace(currentOrigin, '');
+              const relativePath = target.replace(currentOrigin, '');
               navigate(relativePath, { replace: true });
             } else {
-              window.location.href = data.target_url;
+              window.location.href = target;
             }
           } else {
-            navigate(data.target_url, { replace: true });
+            navigate(target, { replace: true });
           }
+        } else if (data.status === 'SCAN_VERIFIED') {
+          navigate(`/admin/dashboard?verified_card=${cardId}`, { replace: true });
         } else {
-          navigate(`/card-status?status=${data.status || 'INACTIVE'}&card_id=${cardId}`, { replace: true });
+          navigate(`/card-status?status=${data.status || 'UNACTIVATED'}&card_id=${cardId}`, { replace: true });
         }
       } catch (err) {
         const status = err.response?.data?.status || 'NOT_FOUND';

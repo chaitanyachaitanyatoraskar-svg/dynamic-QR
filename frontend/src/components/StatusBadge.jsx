@@ -10,6 +10,7 @@ export const StatusBadge = ({ status }) => {
       color = 'success';
       variant = 'filled';
       break;
+    case 'UNACTIVATED':
     case 'AVAILABLE':
       color = 'info';
       variant = 'outlined';

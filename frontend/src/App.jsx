@@ -44,6 +44,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
 
           {/* Dynamic QR & NFC Engine */}
+          <Route path="/q/:cardId" element={<DynamicGoResolver />} />
           <Route path="/go/:cardId" element={<DynamicGoResolver />} />
           <Route path="/card-status" element={<CardStatusPage />} />
 

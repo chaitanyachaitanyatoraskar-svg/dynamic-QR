@@ -18,6 +18,8 @@ api.interceptors.request.use((config) => {
 });
 
 export const authService = {
+  getSetupStatus: () => api.get('/api/auth/setup-status/'),
+  setupAdmin: (data) => api.post('/api/auth/setup-admin/', data),
   login: (username, password) => api.post('/api/auth/login/', { username, password }),
   logout: () => api.post('/api/auth/logout/'),
   me: () => api.get('/api/auth/me/'),
@@ -35,13 +37,22 @@ export const cardService = {
   list: (params) => api.get('/api/cards/', { params }),
   get: (id) => api.get(`/api/cards/${id}/`),
   create: (data) => api.post('/api/cards/', data),
-  activate: (id, data) => api.post(`/api/cards/${id}/activate/`, data),
+  updateDestination: (id, destination_url) => api.post(`/api/cards/${id}/update-destination/`, { destination_url }),
   suspend: (id, data) => api.post(`/api/cards/${id}/suspend/`, data),
   deactivate: (id, data) => api.post(`/api/cards/${id}/deactivate/`, data),
-  reassign: (id, data) => api.post(`/api/cards/${id}/reassign/`, data),
   bulkGenerate: (data) => api.post('/api/cards/bulk-generate/', data),
   downloadQrUrl: (id, format = 'png') => `${API_BASE}/api/cards/${id}/download_qr/?format=${format}`,
-  resolveDirect: (token) => api.get(`/go/${token}/`, { headers: { Accept: 'application/json' } }),
+  resolveDirect: (token, sessionToken) => api.get(`/q/${token}/`, {
+    params: sessionToken ? { session_token: sessionToken } : {},
+    headers: { Accept: 'application/json' }
+  }),
+};
+
+export const activationSessionService = {
+  start: () => api.post('/api/cards/activation-sessions/start/'),
+  checkStatus: (id) => api.get(`/api/cards/activation-sessions/${id}/status/`),
+  verifyScan: (id, card_id) => api.post(`/api/cards/activation-sessions/${id}/verify-scan/`, { card_id }),
+  complete: (id, data) => api.post(`/api/cards/activation-sessions/${id}/complete/`, data),
 };
 
 export const menuService = {

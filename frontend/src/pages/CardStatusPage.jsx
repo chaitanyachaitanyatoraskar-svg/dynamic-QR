@@ -31,9 +31,9 @@ export const CardStatusPage = () => {
     message = "This card has been retired or deactivated by the platform.";
     Icon = ErrorIcon;
     chipColor = 'error';
-  } else if (status === 'AVAILABLE') {
-    title = "Card In Inventory";
-    message = "This card is printed and ready in inventory, but has not yet been assigned or activated.";
+  } else if (status === 'UNACTIVATED' || status === 'AVAILABLE') {
+    title = "QR NOT ACTIVATED";
+    message = "This QR code has not been activated yet.";
     Icon = InfoOutlinedIcon;
     chipColor = 'info';
   }

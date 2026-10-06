@@ -3,10 +3,9 @@ import qrcode
 from qrcode.image.svg import SvgPathImage
 from django.conf import settings
 from django.core.files.base import ContentFile
-
 def get_card_target_url(card_id, domain=None):
     base = domain or settings.PUBLIC_DOMAIN
-    return f"{base.rstrip('/')}/go/{card_id}"
+    return f"{base.rstrip('/')}/q/{card_id}"
 
 def generate_qr_png_bytes(card_id, domain=None, box_size=12, border=4):
     """

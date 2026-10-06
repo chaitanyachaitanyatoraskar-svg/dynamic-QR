@@ -1,25 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Box, Card, CardContent, Typography, TextField, Button,
-  Alert, Divider, Stack, Chip, CircularProgress
+  Alert, Divider, Stack, CircularProgress
 } from '@mui/material';
 import ContactlessIcon from '@mui/icons-material/Contactless';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import StoreIcon from '@mui/icons-material/Store';
 import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/api';
 
 export const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [isSetupMode, setIsSetupMode] = useState(false);
+  const [checkingSetup, setCheckingSetup] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const checkSetup = async () => {
+      try {
+        const res = await authService.getSetupStatus();
+        if (res.data.needs_setup) {
+          setIsSetupMode(true);
+        }
+      } catch (err) {
+        console.error("Setup check error", err);
+      } finally {
+        setCheckingSetup(false);
+      }
+    };
+    checkSetup();
+  }, []);
+
   const handleLogin = async (e) => {
-    e?.preventDefault();
+    e.preventDefault();
     if (!username || !password) {
       setError('Please provide both username and password.');
       return;
@@ -36,25 +56,46 @@ export const LoginPage = () => {
       }
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.non_field_errors?.[0] || 'Invalid credentials. Please check username and password.');
+      setError(err.response?.data?.non_field_errors?.[0] || 'Invalid credentials. Please verify your username and password.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleQuickDemoLogin = (demoUser, demoPass) => {
-    setUsername(demoUser);
-    setPassword(demoPass);
-    login(demoUser, demoPass).then((user) => {
-      if (user.role === 'SUPER_ADMIN') {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/dashboard');
-      }
-    }).catch((err) => {
-      setError('Demo login failed. Make sure database is seeded.');
-    });
+  const handleInitialSetup = async (e) => {
+    e.preventDefault();
+    if (!username || !password) {
+      setError('Username and password are required.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError('');
+      const res = await authService.setupAdmin({ username, password, email });
+      localStorage.setItem('auth_token', res.data.token);
+      setSuccessMsg('Administrator account created! Logging in...');
+      setTimeout(() => {
+        window.location.href = '/admin/dashboard';
+      }, 800);
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.error || 'Setup failed. Please try again.');
+      setSubmitting(false);
+    }
   };
+
+  if (checkingSetup) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f8fafc' }}>
+        <CircularProgress size={32} />
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -85,92 +126,109 @@ export const LoginPage = () => {
             >
               <ContactlessIcon fontSize="medium" />
             </Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-              Sign In to Dynamic QR
+            <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary' }}>
+              {isSetupMode ? 'Initial Platform Setup' : 'Platform Sign In'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Enter credentials to access your console
+              {isSetupMode
+                ? 'Create your Master Administrator credentials to get started'
+                : 'Enter credentials to access your console'}
             </Typography>
           </Box>
 
           {error && <Alert severity="error" sx={{ mb: 2.5 }}>{error}</Alert>}
+          {successMsg && <Alert severity="success" sx={{ mb: 2.5 }}>{successMsg}</Alert>}
 
-          <form onSubmit={handleLogin}>
-            <TextField
-              fullWidth
-              label="Username"
-              variant="outlined"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              margin="normal"
-              required
-              autoFocus
-            />
-            <TextField
-              fullWidth
-              label="Password"
-              type="password"
-              variant="outlined"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              margin="normal"
-              required
-            />
-            <Button
-              fullWidth
-              type="submit"
-              variant="contained"
-              size="large"
-              color="primary"
-              disabled={submitting}
-              startIcon={submitting && <CircularProgress size={16} />}
-              sx={{ mt: 2.5, mb: 2, py: 1.2 }}
-            >
-              Sign In
-            </Button>
-          </form>
-
-          <Divider sx={{ my: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              QUICK DEMO ACCOUNTS
-            </Typography>
-          </Divider>
-
-          <Stack spacing={1.5}>
-            <Button
-              fullWidth
-              variant="outlined"
-              color="primary"
-              size="small"
-              startIcon={<AdminPanelSettingsIcon />}
-              onClick={() => handleQuickDemoLogin('admin', 'admin123')}
-              sx={{ justifyContent: 'flex-start', py: 1 }}
-            >
-              <Box sx={{ textAlign: 'left', flexGrow: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>Log in as Super Admin</Typography>
-                <Typography variant="caption" color="text.secondary">admin / admin123 (Full control)</Typography>
-              </Box>
-            </Button>
-
-            <Button
-              fullWidth
-              variant="outlined"
-              color="secondary"
-              size="small"
-              startIcon={<StoreIcon />}
-              onClick={() => handleQuickDemoLogin('restaurant_owner', 'owner123')}
-              sx={{ justifyContent: 'flex-start', py: 1 }}
-            >
-              <Box sx={{ textAlign: 'left', flexGrow: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>Log in as Business Owner</Typography>
-                <Typography variant="caption" color="text.secondary">restaurant_owner / owner123 (ABC Restaurant)</Typography>
-              </Box>
-            </Button>
-          </Stack>
+          {isSetupMode ? (
+            /* SECURE INITIAL SETUP FORM */
+            <form onSubmit={handleInitialSetup}>
+              <Alert severity="info" sx={{ mb: 2.5 }}>
+                No administrator account exists yet. Create your permanent master administrator account now.
+              </Alert>
+              <TextField
+                fullWidth
+                label="Admin Username"
+                variant="outlined"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                margin="normal"
+                required
+                autoFocus
+              />
+              <TextField
+                fullWidth
+                label="Admin Email"
+                type="email"
+                variant="outlined"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                margin="normal"
+              />
+              <TextField
+                fullWidth
+                label="Secure Password"
+                type="password"
+                variant="outlined"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                margin="normal"
+                required
+                helperText="Minimum 6 characters"
+              />
+              <Button
+                fullWidth
+                type="submit"
+                variant="contained"
+                size="large"
+                color="primary"
+                disabled={submitting}
+                startIcon={submitting ? <CircularProgress size={16} /> : <AdminPanelSettingsIcon />}
+                sx={{ mt: 2.5, mb: 2, py: 1.2, fontWeight: 700 }}
+              >
+                {submitting ? 'Setting up...' : 'Create Master Administrator'}
+              </Button>
+            </form>
+          ) : (
+            /* STANDARD SECURE LOGIN FORM */
+            <form onSubmit={handleLogin}>
+              <TextField
+                fullWidth
+                label="Username"
+                variant="outlined"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                margin="normal"
+                required
+                autoFocus
+              />
+              <TextField
+                fullWidth
+                label="Password"
+                type="password"
+                variant="outlined"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                margin="normal"
+                required
+              />
+              <Button
+                fullWidth
+                type="submit"
+                variant="contained"
+                size="large"
+                color="primary"
+                disabled={submitting}
+                startIcon={submitting && <CircularProgress size={16} />}
+                sx={{ mt: 2.5, mb: 2, py: 1.2, fontWeight: 700 }}
+              >
+                Sign In
+              </Button>
+            </form>
+          )}
 
           <Box sx={{ textAlign: 'center', mt: 3 }}>
             <Button component={RouterLink} to="/" size="small" color="inherit">
-              ← Back to Homepage
+              ← Return to Home
             </Button>
           </Box>
         </CardContent>

@@ -104,7 +104,14 @@ export const AdminBusinessesPage = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {businesses.map((b) => (
+                  {businesses.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
+                        No clients have been added yet. Add your first client above or during card activation.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    businesses.map((b) => (
                     <TableRow key={b.id} hover>
                       <TableCell sx={{ fontWeight: 600, color: 'text.primary' }}>
                         {b.name}
@@ -148,7 +155,8 @@ export const AdminBusinessesPage = () => {
                         </Stack>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )))
+                }
                 </TableBody>
               </Table>
             </TableContainer>
