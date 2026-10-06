@@ -1,0 +1,68 @@
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    config.headers.Authorization = `Token ${token}`;
+  }
+  return config;
+});
+
+export const authService = {
+  login: (username, password) => api.post('/api/auth/login/', { username, password }),
+  logout: () => api.post('/api/auth/logout/'),
+  me: () => api.get('/api/auth/me/'),
+};
+
+export const businessService = {
+  list: () => api.get('/api/businesses/'),
+  get: (id) => api.get(`/api/businesses/${id}/`),
+  create: (data) => api.post('/api/businesses/', data),
+  update: (id, data) => api.patch(`/api/businesses/${id}/`, data),
+  getPublic: (slug) => api.get(`/api/businesses/public/${slug}/`),
+};
+
+export const cardService = {
+  list: (params) => api.get('/api/cards/', { params }),
+  get: (id) => api.get(`/api/cards/${id}/`),
+  create: (data) => api.post('/api/cards/', data),
+  activate: (id, data) => api.post(`/api/cards/${id}/activate/`, data),
+  suspend: (id, data) => api.post(`/api/cards/${id}/suspend/`, data),
+  deactivate: (id, data) => api.post(`/api/cards/${id}/deactivate/`, data),
+  reassign: (id, data) => api.post(`/api/cards/${id}/reassign/`, data),
+  bulkGenerate: (data) => api.post('/api/cards/bulk-generate/', data),
+  downloadQrUrl: (id, format = 'png') => `${API_BASE}/api/cards/${id}/download_qr/?format=${format}`,
+  resolveDirect: (token) => api.get(`/go/${token}/`, { headers: { Accept: 'application/json' } }),
+};
+
+export const menuService = {
+  list: () => api.get('/api/menus/'),
+  get: (id) => api.get(`/api/menus/${id}/`),
+  create: (data) => api.post('/api/menus/', data),
+  getPublic: (slug) => api.get(`/api/menus/public/${slug}/`),
+  createCategory: (data) => api.post('/api/menus/categories/', data),
+  createItem: (data) => api.post('/api/menus/items/', data),
+  updateItem: (id, data) => api.patch(`/api/menus/items/${id}/`, data),
+  deleteItem: (id) => api.delete(`/api/menus/items/${id}/`),
+};
+
+export const analyticsService = {
+  getSummary: (params) => api.get('/api/analytics/summary/', { params }),
+  getEvents: () => api.get('/api/analytics/events/'),
+  trackEvent: (data) => api.post('/api/analytics/track/', data),
+};
+
+export const auditService = {
+  getLogs: () => api.get('/api/audit/logs/'),
+};
+
+export default api;
