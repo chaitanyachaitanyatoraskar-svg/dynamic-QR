@@ -32,7 +32,7 @@ python backend/manage.py seed_demo_data
 ```
 6. Start the Django development server:
 ```bash
-python backend/manage.py runserver 8000
+python backend/manage.py runserver 8088
 ```
 
 ## 3. Frontend Setup
@@ -45,5 +45,5 @@ npm install
 ```bash
 npm run dev
 ```
-The frontend will be available at `http://localhost:5173`.
-The backend API is hosted at `http://localhost:8000`.
+The frontend will be available at `http://localhost:3030`.
+The backend API is hosted at `http://localhost:8088`.

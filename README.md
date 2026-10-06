@@ -70,7 +70,7 @@ source .venv/bin/activate
 pip install -r backend/requirements.txt
 python backend/manage.py migrate
 python backend/manage.py seed_demo_data
-python backend/manage.py runserver 8000
+python backend/manage.py runserver 8088
 ```
 
 ### 3. Frontend
@@ -81,6 +81,6 @@ npm run dev
 ```
 
 Visit:
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:8000`
-- Sample Permanent Card Redirect: `http://localhost:5173/go/A7K92X`
+- Frontend: `http://localhost:3030`
+- Backend API: `http://localhost:8088`
+- Sample Permanent Card Redirect: `http://localhost:3030/go/A7K92X`
