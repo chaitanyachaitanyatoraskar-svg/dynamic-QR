@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, CircularProgress, Typography, Paper, Button } from '@mui/material';
+import { Box, CircularProgress, Typography, Paper, Button, Alert } from '@mui/material';
 import ContactlessIcon from '@mui/icons-material/Contactless';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { cardService } from '../services/api';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8088';
@@ -12,6 +13,7 @@ export const DynamicGoResolver = () => {
   const navigate = useNavigate();
   const [statusMessage, setStatusMessage] = useState('Connecting to dynamic destination...');
   const [destinationUrl, setDestinationUrl] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -25,7 +27,7 @@ export const DynamicGoResolver = () => {
         if (data.status === 'ACTIVE' && target) {
           if (isMounted) {
             setDestinationUrl(target);
-            setStatusMessage(`Redirecting to destination...`);
+            setStatusMessage(`Redirecting to ${target}...`);
           }
 
           // If external destination, perform immediate top-level browser redirect
@@ -54,11 +56,23 @@ export const DynamicGoResolver = () => {
         if (err.response?.status === 403 || err.response?.status === 404) {
           const status = err.response?.data?.status || (err.response?.status === 404 ? 'NOT_FOUND' : 'UNACTIVATED');
           navigate(`/card-status?status=${status}&card_id=${cardId}`, { replace: true });
-        } else {
-          // If AJAX failed (e.g., CORS or network error), perform a direct top-level
-          // browser navigation to the backend /q/ endpoint. Django will issue a native HTTP 302
-          // straight to the destination URL without any CORS limitation.
+          return;
+        }
+
+        // If running in local environment, fallback to direct backend HTTP 302 endpoint
+        const isLocalOrigin = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const isLocalApi = API_BASE.includes('localhost') || API_BASE.includes('127.0.0.1');
+
+        if (isLocalOrigin || !isLocalApi) {
           window.location.replace(`${API_BASE}/q/${cardId}/`);
+        } else {
+          // Running on production site (e.g. Vercel) but API_BASE is still pointing to local machine
+          if (isMounted) {
+            setErrorMessage(
+              'Backend service unreachable. Please ensure the backend API is deployed and VITE_API_BASE is configured on Vercel.'
+            );
+            setStatusMessage('Connection Error');
+          }
         }
       }
     };
@@ -90,7 +104,7 @@ export const DynamicGoResolver = () => {
           borderRadius: 3,
           border: '1px solid #e2e8f0',
           textAlign: 'center',
-          maxWidth: 380,
+          maxWidth: 400,
           width: '100%',
         }}
       >
@@ -99,7 +113,7 @@ export const DynamicGoResolver = () => {
             width: 56,
             height: 56,
             borderRadius: '50%',
-            backgroundColor: '#0f172a',
+            backgroundColor: errorMessage ? '#ef4444' : '#0f172a',
             color: '#fff',
             display: 'inline-flex',
             alignItems: 'center',
@@ -112,10 +126,11 @@ export const DynamicGoResolver = () => {
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
           Routing Card {cardId}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {statusMessage}
         </Typography>
-        <CircularProgress size={28} sx={{ mb: destinationUrl ? 2 : 0 }} />
+
+        {!errorMessage && <CircularProgress size={28} sx={{ mb: destinationUrl ? 2 : 0 }} />}
 
         {destinationUrl && (
           <Box sx={{ mt: 2 }}>
@@ -126,7 +141,25 @@ export const DynamicGoResolver = () => {
               endIcon={<OpenInNewIcon fontSize="small" />}
               sx={{ textTransform: 'none', fontWeight: 600 }}
             >
-              Open Link Directly
+              Open Destination Link
+            </Button>
+          </Box>
+        )}
+
+        {errorMessage && (
+          <Box sx={{ mt: 2, textAlign: 'left' }}>
+            <Alert severity="warning" sx={{ mb: 2, fontSize: '0.8125rem' }}>
+              {errorMessage}
+            </Alert>
+            <Button
+              variant="outlined"
+              fullWidth
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={() => window.location.reload()}
+              sx={{ textTransform: 'none' }}
+            >
+              Retry
             </Button>
           </Box>
         )}

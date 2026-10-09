@@ -26,6 +26,15 @@ class CardSerializer(serializers.ModelSerializer):
         ]
 
     def get_permanent_url(self, obj):
+        request = self.context.get('request')
+        if request:
+            origin = request.headers.get('Origin') or request.headers.get('Referer')
+            if origin:
+                from urllib.parse import urlparse
+                parsed = urlparse(origin)
+                if parsed.scheme and parsed.netloc:
+                    base = f"{parsed.scheme}://{parsed.netloc}"
+                    return obj.get_permanent_url(base_domain=base)
         return obj.get_permanent_url()
 
     def get_qr_image_url(self, obj):

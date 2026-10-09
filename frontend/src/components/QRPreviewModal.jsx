@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Typography, Box, Stack, Divider, IconButton,
-  CircularProgress, Tooltip, ToggleButton, ToggleButtonGroup, Chip
+  CircularProgress, Tooltip, ToggleButton, ToggleButtonGroup, Chip,
+  TextField, InputAdornment
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -10,30 +11,51 @@ import QrCode2Icon from '@mui/icons-material/QrCode2';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone';
+import PublicIcon from '@mui/icons-material/Public';
+import LanguageIcon from '@mui/icons-material/Language';
 import LaptopIcon from '@mui/icons-material/Laptop';
+import EditIcon from '@mui/icons-material/Edit';
 import { cardService } from '../services/api';
 
-const LAN_IP = '192.168.0.153';
+const VERCEL_PRODUCTION_DOMAIN = 'https://dynamic-qr-nu-five.vercel.app';
 
 export const QRPreviewModal = ({ open, onClose, card }) => {
   const [copied, setCopied] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const [scanMode, setScanMode] = useState('local'); // 'local' or 'lan'
+  
+  // Determine default domain: if on Vercel or custom live domain, use window.location.origin
+  const detectedOrigin = (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost'))
+    ? window.location.origin
+    : VERCEL_PRODUCTION_DOMAIN;
+
+  // Domain modes: 'production' (default), 'custom', 'local'
+  const [domainMode, setDomainMode] = useState('production');
+  const [customDomainInput, setCustomDomainInput] = useState('');
+  const [isEditingDomain, setIsEditingDomain] = useState(false);
+
+  useEffect(() => {
+    setImgLoaded(false);
+    setImgError(false);
+  }, [domainMode, customDomainInput, card?.id]);
 
   if (!card) return null;
 
   const targetId = card.id || card.card_id;
-  const isLan = scanMode === 'lan';
-  const customDomain = isLan ? `http://${LAN_IP}:3030` : null;
 
-  const currentPermanentUrl = isLan
-    ? `http://${LAN_IP}:3030/q/${card.card_id}`
-    : (card.permanent_url || `http://localhost:3030/q/${card.card_id}`);
+  // Compute active base domain
+  let activeDomain = detectedOrigin;
+  if (domainMode === 'local') {
+    activeDomain = 'http://localhost:3030';
+  } else if (domainMode === 'custom' && customDomainInput.trim()) {
+    activeDomain = customDomainInput.trim().replace(/\/+$/, '');
+  }
 
-  const qrPngUrl = cardService.downloadQrUrl(targetId, 'png', customDomain);
-  const qrSvgUrl = cardService.downloadQrUrl(targetId, 'svg', customDomain);
+  // The final scan URL embedded in physical media
+  const currentPermanentUrl = `${activeDomain}/q/${card.card_id}`;
+
+  const qrPngUrl = cardService.downloadQrUrl(targetId, 'png', activeDomain);
+  const qrSvgUrl = cardService.downloadQrUrl(targetId, 'svg', activeDomain);
 
   const copyUrl = () => {
     navigator.clipboard.writeText(currentPermanentUrl);
@@ -43,9 +65,7 @@ export const QRPreviewModal = ({ open, onClose, card }) => {
 
   const handleModeChange = (event, newMode) => {
     if (newMode !== null) {
-      setImgLoaded(false);
-      setImgError(false);
-      setScanMode(newMode);
+      setDomainMode(newMode);
     }
   };
 
@@ -74,6 +94,9 @@ export const QRPreviewModal = ({ open, onClose, card }) => {
             <Typography variant="body2" sx={{ fontWeight: 600, color: '#15803d', wordBreak: 'break-all' }}>
               {card.destination_url}
             </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontSize: '0.72rem' }}>
+              Anyone scanning this QR will automatically redirect here.
+            </Typography>
           </Box>
         ) : (
           <Box sx={{ mb: 2, p: 1.5, backgroundColor: '#fffbeb', borderRadius: 2, border: '1px solid #fef3c7', textAlign: 'left' }}>
@@ -86,27 +109,47 @@ export const QRPreviewModal = ({ open, onClose, card }) => {
           </Box>
         )}
 
-        {/* Scan Mode Switcher (Localhost vs Wi-Fi Mobile) */}
+        {/* Domain Selection Tabs */}
         <Box sx={{ mb: 2 }}>
           <ToggleButtonGroup
-            value={scanMode}
+            value={domainMode}
             exclusive
             onChange={handleModeChange}
             size="small"
             fullWidth
+            sx={{ mb: 1 }}
           >
-            <ToggleButton value="local" sx={{ textTransform: 'none', py: 0.5, fontSize: '0.75rem' }}>
-              <LaptopIcon fontSize="small" sx={{ mr: 0.5 }} /> PC / Localhost
+            <ToggleButton value="production" sx={{ textTransform: 'none', py: 0.5, fontSize: '0.75rem', fontWeight: 600 }}>
+              <PublicIcon fontSize="small" sx={{ mr: 0.5 }} /> Live Commercial
             </ToggleButton>
-            <ToggleButton value="lan" sx={{ textTransform: 'none', py: 0.5, fontSize: '0.75rem' }}>
-              <PhoneIphoneIcon fontSize="small" sx={{ mr: 0.5 }} /> Mobile (Wi-Fi Scan)
+            <ToggleButton value="custom" sx={{ textTransform: 'none', py: 0.5, fontSize: '0.75rem' }}>
+              <LanguageIcon fontSize="small" sx={{ mr: 0.5 }} /> Custom Domain
+            </ToggleButton>
+            <ToggleButton value="local" sx={{ textTransform: 'none', py: 0.5, fontSize: '0.75rem' }}>
+              <LaptopIcon fontSize="small" sx={{ mr: 0.5 }} /> Localhost Dev
             </ToggleButton>
           </ToggleButtonGroup>
-          {isLan && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
-              Encoded for Wi-Fi devices via {LAN_IP}:3030
-            </Typography>
+
+          {domainMode === 'custom' && (
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="e.g. https://mybrandqr.com"
+              value={customDomainInput}
+              onChange={(e) => setCustomDomainInput(e.target.value)}
+              helperText="Enter your brand or custom domain for printing"
+              sx={{ mt: 1, mb: 1 }}
+            />
           )}
+
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mt: 0.5 }}>
+            <Chip
+              label={domainMode === 'production' ? "Commercial Print Ready" : domainMode === 'custom' ? "Custom Brand URL" : "Development Only"}
+              size="small"
+              color={domainMode === 'production' ? "primary" : domainMode === 'custom' ? "secondary" : "default"}
+              sx={{ height: 20, fontSize: '0.7rem' }}
+            />
+          </Box>
         </Box>
 
         {/* QR Code Container */}
@@ -128,7 +171,7 @@ export const QRPreviewModal = ({ open, onClose, card }) => {
           {!imgLoaded && !imgError && (
             <Box sx={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
               <CircularProgress size={32} />
-              <Typography variant="caption" color="text.secondary">Rendering QR code...</Typography>
+              <Typography variant="caption" color="text.secondary">Generating print-ready QR...</Typography>
             </Box>
           )}
 
@@ -154,7 +197,7 @@ export const QRPreviewModal = ({ open, onClose, card }) => {
         </Box>
 
         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f172a', mb: 0.5 }}>
-          Redirect Scan URL
+          Redirect Scan URL (Printed on Card)
         </Typography>
         <Box
           sx={{
@@ -174,7 +217,7 @@ export const QRPreviewModal = ({ open, onClose, card }) => {
           }}
         >
           <span style={{ fontWeight: 600 }}>{currentPermanentUrl}</span>
-          <Tooltip title={copied ? "Copied!" : "Copy URL"}>
+          <Tooltip title={copied ? "Copied!" : "Copy permanent URL"}>
             <IconButton size="small" onClick={copyUrl} color={copied ? "success" : "default"}>
               {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
             </IconButton>

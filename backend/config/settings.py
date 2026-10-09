@@ -146,5 +146,5 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # Domain URLs for QR code resolution
-PUBLIC_DOMAIN = os.getenv('PUBLIC_DOMAIN', 'http://localhost:5173')
-BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', 'http://localhost:8000')
+PUBLIC_DOMAIN = os.getenv('PUBLIC_DOMAIN', 'https://dynamic-qr-nu-five.vercel.app')
+BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', 'http://localhost:8088')
