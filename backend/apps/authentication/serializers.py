@@ -7,7 +7,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone', 'business_ids']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone', 'security_question', 'business_ids']
         read_only_fields = ['id', 'business_ids']
 
     def get_business_ids(self, obj):

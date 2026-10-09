@@ -44,9 +44,9 @@ export const LandingPage = () => {
               color="primary"
               component={RouterLink}
               to="/login"
-              startIcon={<LoginIcon />}
+              startIcon={<SecurityIcon />}
             >
-              Portal Login
+              Portal Sign In
             </Button>
           </Stack>
         </Container>
@@ -89,7 +89,7 @@ export const LandingPage = () => {
               endIcon={<ArrowForwardIcon />}
               sx={{ py: 1.5, px: 4, fontSize: '1rem', fontWeight: 700 }}
             >
-              Open Admin Portal
+              Sign In to Portal
             </Button>
           </Stack>
         </Box>

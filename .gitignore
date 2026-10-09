@@ -20,7 +20,8 @@ npm-debug.log*
 .env.local
 *.local
 
-# IDE
+# IDE & Tools
 .vscode/
 .idea/
 .DS_Store
+.gemini/

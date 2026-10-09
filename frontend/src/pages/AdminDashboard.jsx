@@ -31,6 +31,7 @@ export const AdminDashboard = () => {
   // Modals state
   const [selectedCardForQr, setSelectedCardForQr] = useState(null);
   const [activationModalOpen, setActivationModalOpen] = useState(false);
+  const [selectedCardForActivation, setSelectedCardForActivation] = useState(null);
   const [editingCard, setEditingCard] = useState(null);
 
   // Bulk generate modal
@@ -112,7 +113,10 @@ export const AdminDashboard = () => {
             variant="contained"
             color="primary"
             startIcon={<QrCodeScannerIcon />}
-            onClick={() => setActivationModalOpen(true)}
+            onClick={() => {
+              setSelectedCardForActivation(null);
+              setActivationModalOpen(true);
+            }}
             sx={{ fontWeight: 700 }}
           >
             Activate QR (Physical Scan)
@@ -266,8 +270,11 @@ export const AdminDashboard = () => {
                             <IconButton
                               size="small"
                               color="primary"
-                              title="Activate via Physical Scan"
-                              onClick={() => setActivationModalOpen(true)}
+                              title="Activate Card & Set Redirection"
+                              onClick={() => {
+                                setSelectedCardForActivation(c);
+                                setActivationModalOpen(true);
+                              }}
                             >
                               <QrCodeScannerIcon fontSize="small" />
                             </IconButton>
@@ -307,7 +314,11 @@ export const AdminDashboard = () => {
       {/* Merged First-Scan Activation Modal */}
       <AdminActivationModal
         open={activationModalOpen}
-        onClose={() => setActivationModalOpen(false)}
+        initialCard={selectedCardForActivation}
+        onClose={() => {
+          setActivationModalOpen(false);
+          setSelectedCardForActivation(null);
+        }}
         onSuccess={loadData}
       />
 

@@ -9,20 +9,24 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchMe = async () => {
-      if (token) {
+    const initAuth = async () => {
+      const storedToken = localStorage.getItem('auth_token');
+      if (storedToken) {
         try {
           const res = await authService.me();
           setUser(res.data);
+          setToken(storedToken);
         } catch (err) {
-          console.error("Auth session expired", err);
-          logout();
+          console.warn("Stored auth session invalid:", err);
+          localStorage.removeItem('auth_token');
+          setToken(null);
+          setUser(null);
         }
       }
       setLoading(false);
     };
-    fetchMe();
-  }, [token]);
+    initAuth();
+  }, []);
 
   const login = async (username, password) => {
     const res = await authService.login(username, password);
@@ -31,6 +35,12 @@ export const AuthProvider = ({ children }) => {
     setToken(authToken);
     setUser(userData);
     return userData;
+  };
+
+  const loginWithToken = (authToken, userData) => {
+    localStorage.setItem('auth_token', authToken);
+    setToken(authToken);
+    setUser(userData);
   };
 
   const logout = () => {
@@ -53,6 +63,7 @@ export const AuthProvider = ({ children }) => {
       token,
       loading,
       login,
+      loginWithToken,
       logout,
       isAuthenticated: !!user,
       isSuperAdmin,

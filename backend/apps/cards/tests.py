@@ -135,3 +135,26 @@ class MergedAdminFirstScanActivationTestCase(TestCase):
         card.refresh_from_db()
         self.assertEqual(card.status, Card.STATUS_UNACTIVATED)
         self.assertEqual(card.destination_url, '')
+
+    def test_direct_card_activation(self):
+        """
+        Verify that admin can directly activate a card with a destination URL.
+        """
+        card = Card.objects.create(
+            card_id='DIRECT01',
+            public_token='DIRECT01',
+            status=Card.STATUS_UNACTIVATED
+        )
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.post(f'/api/cards/{card.id}/activate/', {
+            'destination_url': 'https://www.youtube.com',
+            'client_name': 'YouTube Client',
+            'purpose': 'Video Promo'
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+
+        card.refresh_from_db()
+        self.assertEqual(card.status, Card.STATUS_ACTIVE)
+        self.assertEqual(card.destination_url, 'https://www.youtube.com')
+        self.assertIsNotNone(card.activated_at)
+

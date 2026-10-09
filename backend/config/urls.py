@@ -8,7 +8,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     # Core Dynamic Redirect Engine (Permanent QR/NFC routing)
+    path('q/<str:token>', DynamicRedirectView.as_view()),
     path('q/<str:token>/', DynamicRedirectView.as_view(), name='qr-redirect'),
+    path('go/<str:token>', DynamicRedirectView.as_view()),
     path('go/<str:token>/', DynamicRedirectView.as_view(), name='dynamic-redirect'),
 
     # REST APIs

@@ -21,8 +21,13 @@ export const authService = {
   getSetupStatus: () => api.get('/api/auth/setup-status/'),
   setupAdmin: (data) => api.post('/api/auth/setup-admin/', data),
   login: (username, password) => api.post('/api/auth/login/', { username, password }),
+  autoLogin: () => api.post('/api/auth/auto-login/'),
   logout: () => api.post('/api/auth/logout/'),
   me: () => api.get('/api/auth/me/'),
+  getSecurityQuestions: () => api.get('/api/auth/security-questions/'),
+  getSecurityQuestion: (username) => api.post('/api/auth/forgot-password/get-question/', { username }),
+  resetPasswordWithQuestion: (data) => api.post('/api/auth/forgot-password/reset/', data),
+  setSecurityQuestion: (data) => api.post('/api/auth/set-security-question/', data),
 };
 
 export const businessService = {
@@ -37,13 +42,23 @@ export const cardService = {
   list: (params) => api.get('/api/cards/', { params }),
   get: (id) => api.get(`/api/cards/${id}/`),
   create: (data) => api.post('/api/cards/', data),
+  activate: (id, data) => api.post(`/api/cards/${id}/activate/`, data),
   updateDestination: (id, destination_url) => api.post(`/api/cards/${id}/update-destination/`, { destination_url }),
   suspend: (id, data) => api.post(`/api/cards/${id}/suspend/`, data),
   deactivate: (id, data) => api.post(`/api/cards/${id}/deactivate/`, data),
   bulkGenerate: (data) => api.post('/api/cards/bulk-generate/', data),
-  downloadQrUrl: (id, format = 'png') => `${API_BASE}/api/cards/${id}/download_qr/?format=${format}`,
+  downloadQrUrl: (id, format = 'png', domain = null) => {
+    let url = `${API_BASE}/api/cards/${id}/download_qr/?format=${format}`;
+    if (domain) {
+      url += `&domain=${encodeURIComponent(domain)}`;
+    }
+    return url;
+  },
   resolveDirect: (token, sessionToken) => api.get(`/q/${token}/`, {
-    params: sessionToken ? { session_token: sessionToken } : {},
+    params: {
+      format: 'json',
+      ...(sessionToken ? { session_token: sessionToken } : {})
+    },
     headers: { Accept: 'application/json' }
   }),
 };

@@ -30,6 +30,12 @@ def sanitize_destination_url(url):
     return f"https://{url}"
 
 
+def wants_json(request):
+    """Determines whether the client expects a JSON response."""
+    accept = request.headers.get('Accept', '')
+    return ('application/json' in accept) or (request.query_params.get('format') == 'json')
+
+
 class DynamicRedirectView(APIView):
     """
     GET /q/{token} and GET /go/{token}
@@ -87,7 +93,7 @@ class DynamicRedirectView(APIView):
             if not target:
                 target = f"{domain}/business/{card.business.slug}" if card.business else f"{domain}/"
 
-            if request.headers.get('Accept') == 'application/json' or request.query_params.get('format') == 'json':
+            if wants_json(request):
                 return Response({
                     'status': 'ACTIVE',
                     'card_id': card.card_id,
@@ -134,7 +140,7 @@ class DynamicRedirectView(APIView):
                 card.first_scan_user_agent = user_agent[:500]
                 card.save()
 
-                if request.headers.get('Accept') == 'application/json' or request.query_params.get('format') == 'json':
+                if wants_json(request):
                     return Response({
                         'status': 'SCAN_VERIFIED',
                         'card_id': card.card_id,
@@ -146,7 +152,7 @@ class DynamicRedirectView(APIView):
                 return HttpResponseRedirect(f"{domain}/admin/activate?session_id={active_session.id}&card_id={card.card_id}")
 
             # ANONYMOUS PUBLIC SCAN: DO NOT ACTIVATE. Render polite "QR NOT ACTIVATED" page.
-            if request.headers.get('Accept') == 'application/json' or request.query_params.get('format') == 'json':
+            if wants_json(request):
                 return Response({
                     'status': 'UNACTIVATED',
                     'card_id': card.card_id,
@@ -157,7 +163,7 @@ class DynamicRedirectView(APIView):
 
         # 4. If SUSPENDED or DEACTIVATED
         if card.status == Card.STATUS_SUSPENDED:
-            if request.headers.get('Accept') == 'application/json':
+            if wants_json(request):
                 return Response({
                     'status': 'SUSPENDED',
                     'card_id': card.card_id,
@@ -166,7 +172,7 @@ class DynamicRedirectView(APIView):
             return HttpResponseRedirect(f"{domain}/card-status?status=SUSPENDED&card_id={card.card_id}")
 
         if card.status == Card.STATUS_DEACTIVATED:
-            if request.headers.get('Accept') == 'application/json':
+            if wants_json(request):
                 return Response({
                     'status': 'DEACTIVATED',
                     'card_id': card.card_id,
@@ -178,7 +184,7 @@ class DynamicRedirectView(APIView):
 
     def _handle_not_found(self, request, token):
         domain = settings.PUBLIC_DOMAIN.rstrip('/')
-        if request.headers.get('Accept') == 'application/json':
+        if wants_json(request):
             return Response({
                 'status': 'NOT_FOUND',
                 'error': 'Sorry, this card does not exist.'
@@ -357,15 +363,51 @@ class ActivationSessionViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_200_OK)
 
 
+from rest_framework.renderers import BaseRenderer
+
+class PassthroughRenderer(BaseRenderer):
+    media_type = '*/*'
+    format = ''
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
+
+class PNGRenderer(BaseRenderer):
+    media_type = 'image/png'
+    format = 'png'
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
+
+class SVGRenderer(BaseRenderer):
+    media_type = 'image/svg+xml'
+    format = 'svg'
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
+
+
 class CardViewSet(viewsets.ModelViewSet):
     serializer_class = CardSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_permissions(self):
+        if getattr(self, 'action', None) == 'download_qr':
+            return [permissions.AllowAny()]
+        return super().get_permissions()
+
+    def get_renderers(self):
+        if getattr(self, 'action', None) == 'download_qr':
+            return [PNGRenderer(), SVGRenderer(), PassthroughRenderer()]
+        return super().get_renderers()
+
     def get_queryset(self):
+        if getattr(self, 'action', None) == 'download_qr':
+            return Card.objects.all()
+
         user = self.request.user
-        if user.is_super_admin:
+        if getattr(user, 'is_authenticated', False) and getattr(user, 'is_super_admin', False):
             return Card.objects.all().select_related('business', 'activated_by', 'first_scanned_by')
-        return Card.objects.filter(business__members__user=user).select_related('business')
+        elif getattr(user, 'is_authenticated', False):
+            return Card.objects.filter(business__members__user=user).select_related('business')
+        return Card.objects.none()
 
     def perform_create(self, serializer):
         if not self.request.user.is_super_admin:
@@ -407,6 +449,62 @@ class CardViewSet(viewsets.ModelViewSet):
         )
         return Response(CardSerializer(card).data, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='activate')
+    def activate(self, request, pk=None):
+        """
+        Directly activates an unactivated card with a redirection destination URL.
+        Allows instant activation from the dashboard.
+        """
+        if not request.user.is_super_admin:
+            raise PermissionDenied("Only administrators can activate cards.")
+
+        card = self.get_object()
+        destination_url = sanitize_destination_url(request.data.get('destination_url', ''))
+        if not destination_url:
+            return Response({'error': 'Valid destination URL is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        business = None
+        if request.data.get('business_id'):
+            business = get_object_or_404(Business, pk=request.data['business_id'])
+        elif request.data.get('client_name'):
+            client_name = request.data['client_name'].strip()
+            if client_name:
+                business, _ = Business.objects.get_or_create(
+                    name=client_name,
+                    defaults={'status': Business.STATUS_ACTIVE}
+                )
+
+        ip = request.META.get('REMOTE_ADDR', '')
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+
+        card.business = business
+        card.destination_url = destination_url
+        card.purpose = request.data.get('purpose', 'Client Website')
+        card.status = Card.STATUS_ACTIVE
+        card.activated_at = timezone.now()
+        card.activated_by = request.user
+        if not card.first_scanned_at:
+            card.first_scanned_at = timezone.now()
+            card.first_scanned_by = request.user
+            card.first_scan_ip = ip
+            card.first_scan_user_agent = user_agent[:500]
+        if request.data.get('notes'):
+            card.notes = request.data['notes']
+        card.save()
+
+        AuditLog.objects.create(
+            user=request.user,
+            action=AuditLog.ACTION_CARD_ACTIVATED,
+            card=card,
+            business=business,
+            details={'destination_url': destination_url, 'direct_activation': True}
+        )
+
+        return Response({
+            'message': f"Card {card.card_id} activated successfully.",
+            'card': CardSerializer(card).data
+        }, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=['post'])
     def suspend(self, request, pk=None):
         card = self.get_object()
@@ -438,20 +536,32 @@ class CardViewSet(viewsets.ModelViewSet):
         )
         return Response(CardSerializer(card).data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['get'])
+    @action(
+        detail=True,
+        methods=['get'],
+        permission_classes=[permissions.AllowAny],
+        renderer_classes=[PNGRenderer, SVGRenderer, PassthroughRenderer]
+    )
     def download_qr(self, request, pk=None):
-        card = self.get_object()
+        if str(pk).isdigit():
+            card = get_object_or_404(Card, id=pk)
+        else:
+            card = get_object_or_404(Card, card_id=pk)
+
         fmt = request.query_params.get('format', 'png').lower()
+        as_download = request.query_params.get('download', '').lower() in ['1', 'true', 'yes']
+        disposition = 'attachment' if as_download else 'inline'
+        custom_domain = request.query_params.get('domain')
 
         if fmt == 'svg':
-            svg_data = generate_qr_svg_bytes(card.card_id)
+            svg_data = generate_qr_svg_bytes(card.card_id, domain=custom_domain)
             response = HttpResponse(svg_data, content_type='image/svg+xml')
-            response['Content-Disposition'] = f'attachment; filename="qr_{card.card_id}.svg"'
+            response['Content-Disposition'] = f'{disposition}; filename="qr_{card.card_id}.svg"'
             return response
 
-        png_data = generate_qr_png_bytes(card.card_id)
+        png_data = generate_qr_png_bytes(card.card_id, domain=custom_domain)
         response = HttpResponse(png_data, content_type='image/png')
-        response['Content-Disposition'] = f'attachment; filename="qr_{card.card_id}.png"'
+        response['Content-Disposition'] = f'{disposition}; filename="qr_{card.card_id}.png"'
         return response
 
     @action(detail=False, methods=['post'], url_path='bulk-generate')
